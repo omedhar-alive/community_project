@@ -78,13 +78,6 @@ class CreateSingleAppartments(BaseModel):
 
 ###CREATE_ENDPOINTS###
 
-@app.post("/create_single_appartment")
-def create_appartment(apt: CreateSingleAppartments,db: sqlite3.Connection = Depends(get_db)):
-    cursor = db.cursor()
-    cursor.execute("INSERT INTO appartments (appartment_number,building,floor,owner_id) VALUES (?,?,?,?)",(apt.appartment_number,apt.building,apt.floor,apt.owner_id))
-    db.commit()
-    return f"Appartment added successfully"
-
 @app.post("/create_all_appartments")
 def create_all_appartments(path:str,db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
@@ -99,7 +92,7 @@ def create_all_appartments(path:str,db: sqlite3.Connection = Depends(get_db)):
     return f"Appartments added succsessfully"
 
 
-@app.post("/create_user")
+@app.post("/user")
 def create_user(data:CreateUser,current_owner=Depends(authorize_owner),db:sqlite3.Connection=Depends(get_db)):
     owner_id = current_owner["id"]
     password_hash = hash_password(data.password)
