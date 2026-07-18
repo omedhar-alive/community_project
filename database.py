@@ -1,6 +1,6 @@
 import sqlite3
 
-connection = sqlite3.connect("community_project.db")
+connection = sqlite3.connect("")
 cursor = connection.cursor()
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL)""")
