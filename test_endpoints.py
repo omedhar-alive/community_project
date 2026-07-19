@@ -3,6 +3,7 @@ from main import app,get_db
 import sqlite3
 import pytest
 from apt_generator import apt_generator
+from pathlib import Path
 client = TestClient(app)
 
 def overide_get_db():
@@ -54,9 +55,9 @@ def test_owner_create_user(fresh_db):
     assert user_owner_id == owner_id
 
 def test_delete_owner(fresh_db):
-    connection = sqlite3.Connection("test.db")
+    connection = sqlite3.Connection("test.db",check_same_thread=False)
     connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foregin_keys= ON")
+    connection.execute("PRAGMA foreign_keys= ON")
     cursor = connection.cursor()
     created_owner = client.post("/owners",json={"name":"Omar","phone_number": "123456789","email":"omedhar@gmail.com","password":"SECRET_KEY"})
     response = client.post("/owners/login",data={"username":"omedhar@gmail.com","password":"SECRET_KEY"})
@@ -64,11 +65,10 @@ def test_delete_owner(fresh_db):
     cursor.execute("SELECT * FROM owners WHERE email= ?",("omedhar@gmail.com",))
     owner = cursor.fetchone()
     owner_id = owner["id"]
-    created_user = client.post("/users",headers={"Authorization": f"Bearer {token}"},json={"Name":"user","email":"user@example.com","role":"tennant","password":"123456","owner_id":owner_id})
+    created_user = client.post("/user",headers={"Authorization": f"Bearer {token}"},json={"name":"user","email":"user@example.com","phone_number":"54321","role":"tennant","password":"123456","owner_id":owner_id})
     cursor.execute("DELETE FROM owners WHERE email= ?",("omedhar@gmail.com",))
     connection.commit()
     cursor.execute("SELECT * FROM users WHERE owner_id= ?",(owner_id,))
-
     user = cursor.fetchall()
     assert user == []
 
@@ -81,7 +81,8 @@ def test_delete_owner_apt(fresh_db):
     cursor.execute("SELECT * FROM owners where email= ?",("omedhar@gmail.com",))
     owner = cursor.fetchone()
     owner_id = owner["id"]
-    client.post("/create_all_appartments",params={"path":"/Users/omar/Desktop/Learning projects/community project/building_configs.json"})
+    config_file = Path(__file__).parent / "building_configs.json"
+    client.post("/create_all_appartments",params={"path":str(config_file)})
     client.patch(f"/owner/{owner_id}/appartments",params={"display_name":"106/22"})
     cursor.execute("DELETE FROM owners WHERE id= ?",(owner_id,))
     connection.commit()
@@ -91,4 +92,3 @@ def test_delete_owner_apt(fresh_db):
     if apt_id != None:    
         apt_owner_id = appartment["owner_id"]
     assert apt_owner_id == None
-
