@@ -66,6 +66,8 @@ def test_delete_owner(fresh_db):
     owner = cursor.fetchone()
     owner_id = owner["id"]
     created_user = client.post("/user",headers={"Authorization": f"Bearer {token}"},json={"name":"user","email":"user@example.com","phone_number":"54321","role":"tennant","password":"123456","owner_id":owner_id})
+    verify_user = client.get("/users",headers={"Authorization":f"Bearer {token}"})
+    user_id = verify_user.json()["id"]
     cursor.execute("DELETE FROM owners WHERE email= ?",("omedhar@gmail.com",))
     connection.commit()
     cursor.execute("SELECT * FROM users WHERE owner_id= ?",(owner_id,))
@@ -88,7 +90,6 @@ def test_delete_owner_apt(fresh_db):
     connection.commit()
     cursor.execute("SELECT * FROM appartments WHERE display_name= ?",("106/22",))
     appartment = cursor.fetchone()
-    apt_id = appartment["id"]
-    if apt_id != None:    
-        apt_owner_id = appartment["owner_id"]
+    apt_id = appartment["id"] 
+    apt_owner_id = appartment["owner_id"]
     assert apt_owner_id == None
