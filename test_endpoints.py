@@ -64,10 +64,12 @@ def test_delete_owner(fresh_db):
     token = response.json()["access_token"]
     cursor.execute("SELECT * FROM owners WHERE email= ?",("omedhar@gmail.com",))
     owner = cursor.fetchone()
+    assert owner is not None
     owner_id = owner["id"]
     created_user = client.post("/user",headers={"Authorization": f"Bearer {token}"},json={"name":"user","email":"user@example.com","phone_number":"54321","role":"tennant","password":"123456","owner_id":owner_id})
-    verify_user = client.get("/users",headers={"Authorization":f"Bearer {token}"})
-    user_id = verify_user.json()["id"]
+    cursor.execute("SELECT * FROM users WHERE email= ?",("user@example.com",))
+    verify_user = cursor.fetchone()
+    assert verify_user is not None
     cursor.execute("DELETE FROM owners WHERE email= ?",("omedhar@gmail.com",))
     connection.commit()
     cursor.execute("SELECT * FROM users WHERE owner_id= ?",(owner_id,))
@@ -82,14 +84,16 @@ def test_delete_owner_apt(fresh_db):
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM owners where email= ?",("omedhar@gmail.com",))
     owner = cursor.fetchone()
+    assert owner is not None
     owner_id = owner["id"]
     config_file = Path(__file__).parent / "building_configs.json"
     client.post("/create_all_appartments",params={"path":str(config_file)})
     client.patch(f"/owner/{owner_id}/appartments",params={"display_name":"106/22"})
+    cursor.execute("SELECT * FROM appartments WHERE display_name= ?",("106/22",))
+    apt_verify = cursor.fetchone()
+    assert apt_verify["owner_id"] is not None
     cursor.execute("DELETE FROM owners WHERE id= ?",(owner_id,))
     connection.commit()
     cursor.execute("SELECT * FROM appartments WHERE display_name= ?",("106/22",))
     appartment = cursor.fetchone()
-    apt_id = appartment["id"] 
-    apt_owner_id = appartment["owner_id"]
-    assert apt_owner_id == None
+    assert appartment["owner_id"] == None
