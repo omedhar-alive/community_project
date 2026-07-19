@@ -19,7 +19,7 @@ app.dependency_overrides[get_db]= overide_get_db
 
 @pytest.fixture
 def fresh_db():
-    connection = sqlite3.connect("test.db")
+    connection = sqlite3.connect("test.db",check_same_thread=False)
     cursor = connection.cursor()
     cursor.execute("""CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL)""")
     connection.commit()
@@ -27,14 +27,14 @@ def fresh_db():
     connection.commit()
     cursor.execute("""CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,role TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,owner_id INTEGER NOT NULL,password_hash TEXT NOT NULL,FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE)""")
     connection.commit()
-    yield 
+    yield connection
     cursor.execute("DROP TABLE owners")
     connection.commit()
     cursor.execute("DROP TABLE users")
     connection.commit()
     cursor.execute("DROP TABLE appartments")
     connection.commit()
-
+    connection.close()
 
 
 def test_owner_create_user(fresh_db):
@@ -45,7 +45,7 @@ def test_owner_create_user(fresh_db):
     owner_create_user = client.post("/user",headers={"Authorization" : f"Bearer {token}"},json={"name":"omartest","phone_number":"9999","email":"pytest@test.com","password":"pytest","role":"pytest","owner_id":4})
     owner = client.get("/owners",headers={"Authorization" : f"Bearer {token}"})
     owner_id = owner.json()["id"]
-    connection = sqlite3.connect("test.db",check_same_thread=False)
+    connection = fresh_db
     connection.execute("PRAGMA foreign_keys= ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
@@ -55,7 +55,7 @@ def test_owner_create_user(fresh_db):
     assert user_owner_id == owner_id
 
 def test_delete_owner(fresh_db):
-    connection = sqlite3.Connection("test.db",check_same_thread=False)
+    connection = fresh_db
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys= ON")
     cursor = connection.cursor()
@@ -78,7 +78,7 @@ def test_delete_owner(fresh_db):
 
 def test_delete_owner_apt(fresh_db):
     client.post("/owners",json={"name":"Omar","phone_number": "123456789","email":"omedhar@gmail.com","password":"SECRET_KEY"})
-    connection = sqlite3.Connection("test.db",check_same_thread=False)
+    connection = fresh_db
     connection.execute("PRAGMA foreign_keys= ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
