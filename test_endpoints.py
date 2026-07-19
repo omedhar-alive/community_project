@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from main import app,get_db
 import sqlite3
 import pytest
+from apt_generator import apt_generator
 client = TestClient(app)
 
 def overide_get_db():
@@ -21,9 +22,9 @@ def fresh_db():
     cursor = connection.cursor()
     cursor.execute("""CREATE TABLE IF NOT EXISTS owners (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL)""")
     connection.commit()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS appartments (id INTEGER PRIMARY KEY AUTOINCREMENT,appartment_number INTEGER NOT NULL,building TEXT NOT NULL,floor INTEGER NOT NULL,display_name TEXT NOT NULL UNIQUE,owner_id INTEGER, FOREIGN KEY (owner_id) REFERENCES owners(id))""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS appartments (id INTEGER PRIMARY KEY AUTOINCREMENT,appartment_number INTEGER NOT NULL,building TEXT NOT NULL,floor INTEGER NOT NULL,display_name TEXT NOT NULL UNIQUE,owner_id INTEGER, FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE SET NULL)""")
     connection.commit()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,role TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,owner_id INTEGER NOT NULL,password_hash TEXT NOT NULL,FOREIGN KEY (owner_id) REFERENCES owners(id))""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,role TEXT NOT NULL,phone_number TEXT NOT NULL UNIQUE,email TEXT NOT NULL UNIQUE,owner_id INTEGER NOT NULL,password_hash TEXT NOT NULL,FOREIGN KEY (owner_id) REFERENCES owners(id) ON DELETE CASCADE)""")
     connection.commit()
     yield 
     cursor.execute("DROP TABLE owners")
@@ -40,18 +41,54 @@ def test_owner_create_user(fresh_db):
     
     logged_owner = client.post("/owners/login",data={"username":"testingthetest@example.com","password":"pwpwpw"})
     token = logged_owner.json()["access_token"]
-    owner_create_user = client.post("/user",headers={"Authorization" : f"bearer {token}"},json={"name":"omartest","phone_number":"9999","email":"pytest@test.com","password":"pytest","role":"pytest","owner_id":4})
-    owner = client.get("/owners",headers={"Authorization" : f"bearer {token}"})
+    owner_create_user = client.post("/user",headers={"Authorization" : f"Bearer {token}"},json={"name":"omartest","phone_number":"9999","email":"pytest@test.com","password":"pytest","role":"pytest","owner_id":4})
+    owner = client.get("/owners",headers={"Authorization" : f"Bearer {token}"})
     owner_id = owner.json()["id"]
     connection = sqlite3.connect("test.db",check_same_thread=False)
     connection.execute("PRAGMA foreign_keys= ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
-    cursor.execute("SELECT owners.email AS owner_email,users.email AS user_email,users.owner_id FROM owners JOIN users ON owners.id = users.owner_id WHERE owners.id = ?",(owner_id,))
-    result = cursor.fetchall()
-    created_user = next((u for u in result if u["user_email"]=="pytest@test.com"))
-    user_owner_id = created_user["owner_id"]
+    cursor.execute("SELECT * FROM users WHERE email= ?",("pytest@test.com",))
+    user = cursor.fetchone()
+    user_owner_id = user["owner_id"]
+    assert user_owner_id == owner_id
 
-    assert user_owner_id == owner_id 
+def test_delete_owner(fresh_db):
+    connection = sqlite3.Connection("test.db")
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foregin_keys= ON")
+    cursor = connection.cursor()
+    created_owner = client.post("/owners",json={"name":"Omar","phone_number": "123456789","email":"omedhar@gmail.com","password":"SECRET_KEY"})
+    response = client.post("/owners/login",data={"username":"omedhar@gmail.com","password":"SECRET_KEY"})
+    token = response.json()["access_token"]
+    cursor.execute("SELECT * FROM owners WHERE email= ?",("omedhar@gmail.com",))
+    owner = cursor.fetchone()
+    owner_id = owner["id"]
+    created_user = client.post("/users",headers={"Authorization": f"Bearer {token}"},json={"Name":"user","email":"user@example.com","role":"tennant","password":"123456","owner_id":owner_id})
+    cursor.execute("DELETE FROM owners WHERE email= ?",("omedhar@gmail.com",))
+    connection.commit()
+    cursor.execute("SELECT * FROM users WHERE owner_id= ?",(owner_id,))
 
+    user = cursor.fetchall()
+    assert user == []
+
+def test_delete_owner_apt(fresh_db):
+    client.post("/owners",json={"name":"Omar","phone_number": "123456789","email":"omedhar@gmail.com","password":"SECRET_KEY"})
+    connection = sqlite3.Connection("test.db",check_same_thread=False)
+    connection.execute("PRAGMA foreign_keys= ON")
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM owners where email= ?",("omedhar@gmail.com",))
+    owner = cursor.fetchone()
+    owner_id = owner["id"]
+    client.post("/create_all_appartments",params={"path":"/Users/omar/Desktop/Learning projects/community project/building_configs.json"})
+    client.patch(f"/owner/{owner_id}/appartments",params={"display_name":"106/22"})
+    cursor.execute("DELETE FROM owners WHERE id= ?",(owner_id,))
+    connection.commit()
+    cursor.execute("SELECT * FROM appartments WHERE display_name= ?",("106/22",))
+    appartment = cursor.fetchone()
+    apt_id = appartment["id"]
+    if apt_id != None:    
+        apt_owner_id = appartment["owner_id"]
+    assert apt_owner_id == None
 

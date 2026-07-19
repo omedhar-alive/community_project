@@ -70,11 +70,6 @@ class UpdateOwners(BaseModel):
     email : EmailStr | None = None
     password_hash : str | None = None
 
-class CreateSingleAppartments(BaseModel):
-    appartment_number : int
-    building : str
-    floor : int
-    owner_id : int | None = None 
 
 ###CREATE_ENDPOINTS###
 
@@ -169,7 +164,7 @@ def update_owner_to_apt(id:int,display_name:str,db:sqlite3.Connection= Depends(g
 
 @app.delete("/delete/{id}")
 def delete_owner(id:int,db:sqlite3.Connection= Depends(get_db)):
-    cursor = db.cursor()
+    cursor = db.cursor()    
     cursor.execute("DELETE FROM owners WHERE id = ?",(id,))
     if cursor.rowcount == 0:
         raise HTTPException(status_code=400,detail="No owner id found")
