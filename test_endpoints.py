@@ -118,6 +118,9 @@ def test_owner_view_other_user(fresh_db):
     get_user_under_b = client.get("/owner/users",headers={"Authorization":f"Bearer {token_b}"})
     assert get_user_under_b.status_code == 200
     assert get_user_under_b.json() == []
+    get_user_under_a = client.get("/owner/users",headers={"Authorization":f"Bearer {token}"})
+    assert get_user_under_a.status_code == 200
+    assert get_user_under_a.json() != []
 
 def test_update_to_other_user(fresh_db):
     connection = fresh_db
