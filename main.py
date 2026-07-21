@@ -87,7 +87,7 @@ def create_all_appartments(path:str,db: sqlite3.Connection = Depends(get_db)):
     return f"Appartments added succsessfully"
 
 
-@app.post("/user")
+@app.post("/users")
 def create_user(data:CreateUser,current_owner=Depends(authorize_owner),db:sqlite3.Connection=Depends(get_db)):
     owner_id = current_owner["id"]
     password_hash = hash_password(data.password)
@@ -122,16 +122,23 @@ def create_owner(owners :Owners,db:sqlite3.Connection=Depends(get_db)):
 
 ###UPDATE_ENDPOINTS###
 
-@app.patch("/users/{id}")
-def update_user(id:int,form:UpdateUser,db:sqlite3.Connection= Depends(get_db)):
+@app.patch("/users/{email}")
+def update_user(email:EmailStr,form:UpdateUser,current_owner=Depends(authorize_owner),db:sqlite3.Connection= Depends(get_db)):
+    owner_id = current_owner["id"]
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE email= ? AND owner_id= ?",(email,owner_id))
+    user = cursor.fetchone()
+    if user is None:
+        raise HTTPException(status_code=401,detail="No user with this email")
+    used_email = user["email"]
     data = form.model_dump(exclude_none=True)
     if not data :
         raise HTTPException(status_code=401,detail="No fields added")
     values = list(data.values())
-    values.append(id)
+    values.append(used_email)
     set_column = ", ".join(f"{column}= ?" for column in data)
     cursor = db.cursor()
-    cursor.execute(f"UPDATE users SET {set_column} WHERE id= ?",values)
+    cursor.execute(f"UPDATE users SET {set_column} WHERE email= ?",values)
     db.commit()
     if cursor.rowcount == 0:
         raise HTTPException(status_code=401,detail="No user found")
@@ -174,7 +181,13 @@ def delete_owner(id:int,db:sqlite3.Connection= Depends(get_db)):
 @app.delete("/user/{email}")
 def delete_user(email:str,current_owner=Depends(authorize_owner),db:sqlite3.Connection=Depends(get_db)):
     cursor = db.cursor()
-    cursor.execute("DELETE from users WHERE email= ?",(email,))
+    owner_id = current_owner["id"]
+    cursor.execute("SELECT * FROM users WHERE email= ? AND owner_id= ?",(email,owner_id))
+    user = cursor.fetchone()
+    if user is None:
+        raise HTTPException(status_code=401,detail="No user with this email")
+    used_email = user["email"]
+    cursor.execute("DELETE from users WHERE email= ?",(used_email,))
     if cursor.rowcount == 0:
         raise HTTPException(status_code=401,detail="No user found")
     db.commit()
